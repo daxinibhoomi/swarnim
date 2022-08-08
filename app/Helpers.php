@@ -42,10 +42,10 @@ class Helpers
     //Decrypt
     public static function CryptoJSAesDecrypt($incomingData){
        try{
-
             $arrInput = $incomingData;
             //base64 decode body data
             $body = base64_decode($arrInput["body"]);
+           
             //json decode body data
             $body = json_decode($body);
 
@@ -58,6 +58,7 @@ class Helpers
 
             //bade64 decode ciphertext
             $ciphertext = base64_decode($body->ciphertext);
+            
             $iterations = 999; 
 
             //generate random key 
@@ -66,8 +67,17 @@ class Helpers
             //decrypt incoming ciphertext
             $decrypted= openssl_decrypt($ciphertext , 'aes-256-cbc', hex2bin($key), OPENSSL_RAW_DATA, $iv);
 
-            //return decrypted data
-            return $decrypted;
+            if( $decrypted == NULL ||  $decrypted == ""){
+                return response()->json(['error' => 'Invalid key'], 400);
+            }else{
+                if($passphrase == $decrypted["header"]["user_key"]){
+                    return response()->json(['data' => $decrypted], 200);
+                }else{
+                    return response()->json(['error' => 'Invalid key'], 400);
+                }
+            }
+
+           
        }catch (\Throwable $th) {
             Log::info("[ERROR][Helpers]" . $th);
             return response()->json(['error' => 'something went wrong'], 500);
