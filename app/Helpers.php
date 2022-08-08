@@ -1,96 +1,88 @@
 <?php
 namespace App;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class Helpers
 {
-    const METHOD = 'aes-256-ctr';
-
-    /**
-     * Encrypts (but does not authenticate) a message
-     * 
-     * @param string $message - plaintext message
-     * @param string $key - encryption key (raw binary expected)
-     * @param boolean $encode - set to TRUE to return a base64-encoded 
-     * @return string (raw binary)
-     */
-    public static function encrypt($message, $key, $encode = true)
-    {
-        $nonceSize = openssl_cipher_iv_length(self::METHOD);
-        $nonce = openssl_random_pseudo_bytes($nonceSize);
-
-        $ciphertext = openssl_encrypt(
-            json_encode($message),
-            self::METHOD,
-            $key,
-            0,
-            $nonce
-        );
-
-        // Now let's pack the IV and the ciphertext together
-        // Naively, we can just concatenate
-        if ($encode) {
-            return base64_encode($nonce.$ciphertext);
-        }
+   //Encrypt
+   public static function CryptoJSAesEncrypt($passphrase,$plain_text){
+    try{
+        //generate random salt & iv
+        $salt = openssl_random_pseudo_bytes(256);
+        $iv = openssl_random_pseudo_bytes(16);
+    
+        $iterations = 999; 
+        //generate random key 
+        $key = hash_pbkdf2("sha512", $passphrase, $salt, $iterations, 512);
+    
+        //encrypt plaintext data
+        $encrypted_data = openssl_encrypt(json_encode($plain_text), 'aes-256-cbc', hex2bin($key), OPENSSL_RAW_DATA, $iv);
         
-        return $nonce.$ciphertext;
+        //create body object
+        $data = [];
+        $data["body"]["ciphertext"] = base64_encode($encrypted_data);
+        $data["body"]["iv"] = bin2hex($iv);
+        $data["body"]["salt"] = bin2hex($salt);
+
+        //json encode the data and convert into base64
+        $data = base64_encode(json_encode($data["body"]));
+        
+        //convert userkey into base64
+        $headers = base64_encode($passphrase);
+        $finalData = array("headers" => array("app_id" => $headers), "body" => $data);
+        return $finalData;
+    }catch (\Throwable $th) {
+        Log::info("[ERROR][Helpers]" . $th);
+        return response()->json(['error' => 'something went wrong'], 500);
+    }
+}
+
+    //Decrypt
+    public static function CryptoJSAesDecrypt($incomingData){
+       try{
+
+            $arrInput = $incomingData;
+            //base64 decode body data
+            $body = base64_decode($arrInput["body"]);
+            //json decode body data
+            $body = json_decode($body);
+
+            $passphrase = $arrInput["headers"];
+            //bade64 decode app_id
+            $passphrase = base64_decode($passphrase["app_id"]);
+
+            $salt = hex2bin($body->salt);
+            $iv  = hex2bin($body->iv);        
+
+            //bade64 decode ciphertext
+            $ciphertext = base64_decode($body->ciphertext);
+            $iterations = 999; 
+
+            //generate random key 
+            $key = hash_pbkdf2("sha512", $passphrase, $salt, $iterations, 64);
+
+            //decrypt incoming ciphertext
+            $decrypted= openssl_decrypt($ciphertext , 'aes-256-cbc', hex2bin($key), OPENSSL_RAW_DATA, $iv);
+
+            //return decrypted data
+            return $decrypted;
+       }catch (\Throwable $th) {
+            Log::info("[ERROR][Helpers]" . $th);
+            return response()->json(['error' => 'something went wrong'], 500);
+        } 
     }
 
-    /**
-     * Decrypts (but does not verify) a message
-     * 
-     * @param string $message - ciphertext message
-     * @param string $key - encryption key (raw binary expected)
-     * @param boolean $encoded - are we expecting an encoded string?
-     * @return string
-     */
-    public static function decrypt($message, $key, $encoded = true)
-    {
-        if ($encoded) {
-            // $message = base64_decode($message, true);
-            $message = $message;
-            if ($message === false) {
-                throw new Exception('Encryption failure');
-            }
-        }
-
-        $nonceSize = openssl_cipher_iv_length(self::METHOD);
-        echo $nonceSize;
-        echo "---------------";
-        $nonce = mb_substr($message, 0, $nonceSize, '8bit');
-        echo $nonce;
-        $ciphertext = mb_substr($message, $nonceSize, null, '8bit');
-        echo "---------------";
-        echo $ciphertext;
-
-        $plaintext = openssl_decrypt(
-            $ciphertext,
-            self::METHOD,
-            $key,
-            0,
-            $nonce,
-        );
-
-        $plaintext = json_decode($plaintext);
-
-        dd($plaintext);
-
-        if(!is_array($plaintext) && !is_object($plaintext)){
-            $plaintext = "";
-        }
-
-        return $plaintext;
+    //generate user_key
+    public static function genearteRandomNumber(){
+        try{
+            $random = Str::random(8);
+            return $random;
+        }catch (\Throwable $th) {
+            Log::info("[ERROR][Helpers]" . $th);
+            return response()->json(['error' => 'something went wrong'], 500);
+        } 
     }
-
-    // public static function checkValidKey($data)
-    // {
-    //     $app_id = base64_decode($data["headers"]["app_id"]);
-    //     $user_key = $data["body"]["headers"]["user_key"];
-
-    //     $checkValidKey = true;
-    //     if($app_id != $user_key){
-    //         $checkValidKey = false;
-    //     }
-    //     return $checkValidKey;
-    // }
 }
 ?>

@@ -19,5 +19,6 @@ Route::middleware('auth:api')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-Route::get('test-encrypt',[TestController::class,'test']);
-Route::post('test-decrypt',[TestController::class,'testDecrypt']);
+Route::get('encrypt',[TestController::class,'encrypt']);
+Route::post('decrypt',[TestController::class,'decrypt']);
+

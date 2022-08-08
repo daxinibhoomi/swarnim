@@ -3,24 +3,38 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Encryption\Encrypter;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Config;
 use App\Helpers;
 
 class TestController extends Controller
 {
-    //
-    public function test(Request $request){
-        $message = array("H" => "Hello"); 
-        $key='1234567890';
-        $data = Helpers::encrypt($message,$key);
-        return $data;
+
+    public function encrypt(){
+
+        $passphrase = "12345678";
+        $plain_text = array(
+            array("name" => array(
+                "first_name" => "Raj",
+                "last_name" => "Raj",
+            )),
+            array(
+                "phone" => "1234567890",
+            )
+        );
+
+        $encryptedData = Helpers::CryptoJSAesEncrypt($passphrase,$plain_text);
+        return response($encryptedData);
     }
 
-    public function testDecrypt(Request $request){
+    public function decrypt(Request $request){
+
         $arrInput = $request->all();
-        $message = "U2FsdGVkX19LTHzJrY1OFCRFArMIqWeD0RFmn4MmzQ0=";
-        // $key= base64_decode($arrInput["headers"]["app_id"]);
-        $key = "1234567890";
-        $data = Helpers::decrypt($message,$key);
-        return $data;
+        $decryptedData = Helpers::CryptoJSAesDecrypt($arrInput);
+        return response($decryptedData);
     }
-}
+} 
+    
+
